@@ -20,3 +20,5 @@ cmd>sc delete OktaImport2
 
 Note: each instance needs a sperate working directory with all the executables added
 	the ony difference in the instances is the app config file
+	
+Note: App.config has csv filename and path and log filename and path which should both be updated to local enviroment
