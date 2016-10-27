@@ -30,9 +30,11 @@ namespace OktaImport
         //get Org info from web.config
         NameValueCollection appSettings = ConfigurationManager.AppSettings;
 
+        OktaBase oktaBase;
 //constructor
         public ImportUser()
         {
+            oktaBase = new OktaBase();
             InitializeComponent();
         }
 
@@ -70,46 +72,57 @@ namespace OktaImport
                     if (ValidateUser(_user))
                     {
 
-                        #region OktaSDK
-                        // see if user exists
+                    #region OktaSDK
+                    _oktauser = null;
 
-                     
-                        try
+                    // make rest api call to see if user exists
+
+//using restsharp here only to test rate limit code
+                    logger.Debug("start check user " + _user.Login);
+                    bool rspRateLimitCheck = false;
+                    do {
+                        //logger.Debug("process user " + _user.Login);
+                        myUrl = OktaBase.oktaOrg + "/api/v1/users/" + _user.Login;
+                        client = new RestClient(myUrl);
+                        request = new RestRequest(Method.GET);
+                        request.AddHeader("cache-control", "no-cache");
+                        request.AddHeader("Accept", "application/json");
+                        request.AddHeader("Content-type", "application/json");
+                        request.AddHeader("Authorization", "SSWS " + OktaBase.apiToken + "");
+                        IRestResponse<User> response = client.Execute<User>(request);
+                        if (response.StatusDescription == "OK")
                         {
-                        _oktauser = OktaBase.usersClient.Get(_user.Login);
+                            _oktauser = response.Data;
+                            rspRateLimitCheck = false;
                         }
-                        catch { }
+                        else
+                        {
+                           // logger.Debug("http status " + response.StatusCode + " check for rate limit on user " + _user.Login);
+                            rspRateLimitCheck = oktaBase.RateLimitCheck(response);
+                        }
+                    } while(rspRateLimitCheck);
 
-                    //// try with normal case.
+                    logger.Debug("complete check user " + _user.Login);
+
+
+
+//this can be used, only commented out so i could test rate limit code
+                    //logger.Debug("start check user " + _user.Login);
                     //try
                     //{
-                    //    _oktauser = OktaBase.usersClient.GetByUsername(_user.Login);
+                    //    _oktauser = OktaBase.usersClient.Get(_user.Login);
                     //}
                     //catch { }
-                    //// now with lower case
-                    //if (_oktauser == null)
-                    //{
-                    //    try
-                    //    {
-                    //        _oktauser = OktaBase.usersClient.GetByUsername(_user.Login.ToLower());
-                    //    }
-                    //    catch { }
-                    //}
-                    //// now with upper case
-                    //if (_oktauser == null)
-                    //{
-                    //    try
-                    //    {
-                    //        _oktauser = OktaBase.usersClient.GetByUsername(_user.Login.ToUpper());
-                    //    }
-                    //    catch { }
-                    //}
-
+                    //logger.Debug("complete check user " + _user.Login);
 
 
                     if (_oktauser != null && !string.IsNullOrEmpty(_oktauser.Id) &&   _oktauser.Credentials.Provider.Name != "OKTA")
                     {
+                        _pw_url = "";
                         // make rest api call to change federation
+                        rspRateLimitCheck = false;
+                        do
+                        {
                         myUrl = OktaBase.oktaOrg + "/api/v1/users/" + _oktauser.Id + "/lifecycle/reset_password?sendEmail=false";
                         client = new RestClient(myUrl);
                         request = new RestRequest(Method.POST);
@@ -117,15 +130,25 @@ namespace OktaImport
                         request.AddHeader("cache-control", "no-cache");
                         request.AddHeader("Accept", "application/json");
                         request.AddHeader("Content-type", "application/json");
-                        request.AddHeader("Authorization", "SSWS " + OktaBase.apiToken + "");
-
-                        _pw_url = "";
-                        try
+                        request.AddHeader("Authorization", "SSWS " + OktaBase.apiToken + "");                     
+                        IRestResponse<resetPasswordResponse> rspResetPassword = client.Execute<resetPasswordResponse>(request);
+                        if (rspResetPassword.StatusDescription == "OK")
                         {
-                            IRestResponse<resetPasswordResponse> response = client.Execute<resetPasswordResponse>(request);
-                            _pw_url = response.Data.resetPasswordUrl;
+                            _pw_url = rspResetPassword.Data.resetPasswordUrl;
+                            rspRateLimitCheck = false;
                         }
-                        catch { }
+                        else
+                        {
+                            rspRateLimitCheck = oktaBase.RateLimitCheck(rspResetPassword);
+                        }
+                    } while (rspRateLimitCheck) ;
+
+
+
+
+
+                    
+
                     }
 
 
@@ -275,7 +298,7 @@ namespace OktaImport
             return bRet;
         }
 
-                protected override void OnStop()
+        protected override void OnStop()
         {
             logger.Debug("enter OnStop ");
         }
