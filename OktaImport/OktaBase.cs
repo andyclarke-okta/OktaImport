@@ -97,12 +97,12 @@ namespace OktaImport
 
             logger.Debug(" Limit Config:" + limitMod + " Remaining:" + remainingMod + " Epoch sec " +  unixTime/1000 + " ResetTime_sec:" + resetMod + " millisToWait:" + millisToWait);
 
-            //if(millisToWait >= 100 )
-            //{
+            if (millisToWait >= 100)
+            {
                 //logger.Debug(" wait for " + myReset.ToString());
                 // wait the reset time then return true to recylce the command
                 WaitTimer(millisToWait);
-            //}
+            }
             return true;
 
         }
