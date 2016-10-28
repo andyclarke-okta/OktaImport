@@ -95,7 +95,7 @@ namespace OktaImport
                             _oktauser = response.Data;
                             rspRateLimitCheck = false;
                         }
-                        else
+                        else if(response.StatusCode.ToString() == "429")
                         {
                            // logger.Debug("http status " + response.StatusCode + " check for rate limit on user " + _user.Login);
                             rspRateLimitCheck = oktaBase.RateLimitCheck(response);
